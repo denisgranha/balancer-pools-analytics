@@ -1,0 +1,11 @@
+{
+  "name": "balancer-pools-analytics",
+  "version": "1.0.0",
+  "description": "Nodejs script for calculating APY of Balancer Pools",
+  "main": "index.js",
+  "author": "Denis Granha <denisgranha@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.1"
+  }
+}
