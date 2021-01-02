@@ -72,8 +72,55 @@ async function getPools(){
         `
     }
   })
-
   return poolResponsePair1.data.data.pools.concat(poolResponsePair2.data.data.pools)
+}
+
+async function getSwapsFromPool(id, swapCount){  
+
+  let swaps = []
+
+  const oneMonthAgo = moment().subtract(1, 'months').unix()
+
+  // let timestamp = oneMonthAgo
+
+  // Max swaps returned by request are 1000. We need to do swapCount/100 requests to get all
+  for(let page = 0; page < swapCount/1000; page++){
+    const swapsResponse = await axios({
+      url: API_URL,
+      method: 'post',
+      data: {
+        query: `
+                {
+                  pools(first: 1, where: {id: "${id}"}) {
+                    swaps(where :{timestamp_gte: ${oneMonthAgo} }, orderBy: timestamp, first: 1000, skip: ${1000*page}) {
+                      id
+                      tokenInSym
+                      tokenOutSym
+                      tokenAmountOut
+                      timestamp
+                      poolLiquidity
+                      feeValue
+                    }
+                  }
+                }
+                `
+              }
+    })
+
+    if(!swapsResponse.data.data){
+      console.error(JSON.stringify(swapsResponse.data.errors, null, 4))
+    }
+    else{
+      // We assume it's always responding one pool
+      let newSwaps = swapsResponse.data.data.pools[0].swaps
+      swaps = swaps.concat(newSwaps)
+    }
+  }
+
+  return swaps
+  
+  
+  
 }
 
 /**
@@ -104,6 +151,30 @@ async function run(){
     if (keyA < keyB) return 1;
     return 0;
   });
+
+  // Iterate all pools and calculate APY's
+  for(let i=0; i<formattedPools.length; i++){
+    // To calculate APY, we can sum up swapfee/totalLiquidity for every swap over a period of time
+    // And extrapolate it to a 1 year period considering it's a compound interest behaviour because the fees 
+    // are deposited into the pool on every trade
+    const swaps = await getSwapsFromPool(formattedPools[i].id, formattedPools[i].swapsCount)
+
+    console.log(`There are ${swaps.length} swaps on pool ${formattedPools[0].id} performed last month`)
+
+    const reducer = (accumulator, currentValue) => {
+      accumulator.totalFeesUSD += parseFloat(currentValue.feeValue)
+
+      // @TODO this is not the real interest, it's a bit bigger because fees are being deposited all the time
+      // thus making it a compound interest
+      accumulator.monthlyInterest += (parseFloat(currentValue.feeValue)/parseFloat(currentValue.poolLiquidity))*100
+
+      return accumulator
+    }
+
+    const extraInfo = swaps.reduce(reducer, {totalFeesUSD: 0, monthlyInterest: 0})
+    // console.log(extraInfo)
+    Object.assign(formattedPools[i], extraInfo)
+  }
 
   console.table(formattedPools)
 }
