@@ -4,7 +4,7 @@ const moment = require('moment')
 const API_URL = "https://api.thegraph.com/subgraphs/name/balancer-labs/balancer"
 
 /**
- * Get all Balancer Shared pools of WETH and DAI (exclusively)
+ * Get all Balancer Shared pools
  */
 async function getPools(){
 
